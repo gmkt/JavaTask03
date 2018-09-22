@@ -77,8 +77,6 @@ public class StudentDB implements StudentGroupQuery {
 
     @Override
     public List<Group> getGroupsByName(Collection<Student> students) {
-        //return students.stream().map(Student::getGroup).distinct().sorted()
-        //        .map(g -> new Group(g, findStudentsByGroup(students, g))).collect(Collectors.toList());
         return getGroupsSortedList(students, nameComparator);
     }
 
