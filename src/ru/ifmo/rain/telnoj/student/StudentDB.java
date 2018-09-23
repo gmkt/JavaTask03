@@ -40,27 +40,27 @@ public class StudentDB implements StudentGroupQuery {
 
     @Override
     public String getMinStudentFirstName(List<Student> students) {
-        return students.stream().min(idComparator).map(Student::getFirstName).orElse("");
+        return getStream(students).min(idComparator).map(Student::getFirstName).orElse("");
     }
 
     @Override
     public List<Student> sortStudentsById(Collection<Student> students) {
-        return getSortedStudentList(students.stream(), idComparator);
+        return getSortedStudentList(getStream(students), idComparator);
     }
 
     @Override
     public List<Student> sortStudentsByName(Collection<Student> students) {
-        return getSortedStudentList(students.stream(), nameComparator);
+        return getSortedStudentList(getStream(students), nameComparator);
     }
 
     @Override
     public List<Student> findStudentsByFirstName(Collection<Student> students, String name) {
-        return getSortedStudentList(getFilteredStream(students, Student::getFirstName, name), nameComparator);
+        return getSortedFilteredStudentListByName(students, Student::getFirstName, name);
     }
 
     @Override
     public List<Student> findStudentsByLastName(Collection<Student> students, String name) {
-        return getSortedStudentList(getFilteredStream(students, Student::getLastName, name), nameComparator);
+        return getSortedFilteredStudentListByName(students, Student::getLastName, name);
     }
 
     @Override
@@ -101,6 +101,10 @@ public class StudentDB implements StudentGroupQuery {
 
     private static final Comparator<Student> idComparator = Comparator.comparingInt(Student::getId);
 
+    private <T> Stream<T> getStream(Collection<T> collection) {
+        return collection.stream();
+    }
+
     private List<String> getValuesList(List<Student> students, Function<Student, String> function) {
         return collectToList(mapStringStream(students, function));
     }
@@ -110,7 +114,7 @@ public class StudentDB implements StudentGroupQuery {
     }
 
     private Stream<String> mapStringStream(List<Student> students, Function<Student, String> function) {
-        return students.stream().map(function);
+        return getStream(students).map(function);
     }
 
     private <T> List<T> collectToList(Stream<T> stream) {
@@ -118,23 +122,29 @@ public class StudentDB implements StudentGroupQuery {
     }
 
     private Stream<Student> getFilteredStream(Collection<Student> students, Function<Student, String> function, String key) {
-        return students.stream().filter(s -> function.apply(s).equals(key));
+        return getStream(students).filter(s -> function.apply(s).equals(key));
+    }
+
+    private List<Student> getSortedFilteredStudentListByName(Collection<Student> students, Function<Student, String> getName, String name) {
+        return getSortedStudentList(getFilteredStream(students, getName, name), nameComparator);
     }
 
     private Stream<Student> getStreamByGroup(Collection<Student> students, String group) {
         return getFilteredStream(students, Student::getGroup, group);
     }
 
+    private <T> Stream<Map.Entry<String, T>> getCollectedInGroupsMapStream(Collection<Student> students, Collector<? super Student, ?, T> collector) {
+        return getStream(getStream(students).collect(Collectors.groupingBy(Student::getGroup, TreeMap::new, collector)).entrySet());
+    }
+
     private List<Group> getGroupsSortedList(Collection<Student> students, Comparator<Student> comparator) {
-        return collectToList(students.stream().collect(Collectors.groupingBy(Student::getGroup, TreeMap::new,
-                Collectors.mapping(Function.identity(), Collectors.toCollection(() ->
-                        new TreeSet<>(comparator))))).entrySet().stream()
+        return collectToList(getCollectedInGroupsMapStream(students, Collectors.mapping(Function.identity(),
+                Collectors.toCollection(() -> new TreeSet<>(comparator))))
                 .map(g -> new Group(g.getKey(), new LinkedList<>(g.getValue()))));
     }
 
     private String getCollectedLargestGroupName(Collection<Student> students, Collector<? super Student, ?, Long> collector) {
-        return students.stream().collect(Collectors.groupingBy(Student::getGroup, TreeMap::new, collector))
-                .entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
+        return getCollectedInGroupsMapStream(students, collector).max(Comparator.comparingLong(Map.Entry::getValue))
                 .orElse(new AbstractMap.SimpleEntry<>("", null)).getKey();
     }
 }
